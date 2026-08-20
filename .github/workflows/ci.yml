@@ -56,7 +56,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.12.2
+          version: v2.13.1
           args: ${{ matrix.lint.args }} -v --timeout=5m --output.json.path=lint-report.json
       - name: Upload lint report
         if: always()
@@ -209,7 +209,16 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates curl unbound dns-root-data bind9-dnsutils libcap2 xxd xz-utils
+          apt-get install -y --no-install-recommends ca-certificates curl unbound dns-root-data bind9-dnsutils jq libcap2 libnss3-tools xxd xz-utils
+          . /etc/os-release
+          if [[ "$ID" == ubuntu ]]; then
+            curl --fail --location --retry 5 --output /usr/share/keyrings/google-chrome.asc https://dl.google.com/linux/linux_signing_key.pub
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
+            apt-get update
+            apt-get install -y --no-install-recommends google-chrome-stable
+          else
+            apt-get install -y --no-install-recommends chromium
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -280,7 +289,10 @@ jobs:
           ncdns -conf testdata/ncdns.conf > /tmp/ncdns.log 2>&1 &
           encayagen -conf "$(pwd)/testdata/encaya.conf"
           chown encaya:encaya testdata/*.pem
-          encaya -conf "$(pwd)/testdata/encaya.conf" > /tmp/encaya.log 2>&1 &
+          encaya -conf "$(pwd)/testdata/encaya.conf" \
+            -encaya.namecoinrpcaddress 127.0.0.1:18554 \
+            -encaya.namecoinrpcusername doggman \
+            -encaya.namecoinrpcpassword donkey > /tmp/encaya.log 2>&1 &
 
           ready=false
           for _ in {1..60}; do
